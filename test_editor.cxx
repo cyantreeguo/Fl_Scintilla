@@ -1,26 +1,4 @@
-//
-// "$Id: editor.cxx 10493 2014-12-19 03:47:32Z greg.ercolano $"
-//
-// A simple text editor program for the Fast Light Tool Kit (FLTK).
-//
-// This program is described in Chapter 4 of the FLTK Programmer's Guide.
-//
-// Copyright 1998-2014 by Bill Spitzak and others.
-//
-// This library is free software. Distribution and use rights are outlined in
-// the file "COPYING" which should have been included with this file.  If this
-// file is missing or damaged, see the license at:
-//
-//     http://www.fltk.org/COPYING.php
-//
-// Please report all bugs and problems on the following page:
-//
-//     http://www.fltk.org/str.php
-//
-
-//
-// Include necessary headers...
-//
+// Copyright 2015-2016 by cyantree <cyantree.guo@gmail.com>
 
 #include <stdio.h>
 #include <stdlib.h>
