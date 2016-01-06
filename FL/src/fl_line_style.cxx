@@ -1,0 +1,362 @@
+//
+// "$Id: fl_line_style.cxx 9293 2012-03-18 18:48:29Z manolo $"
+//
+// Line style code for the Fast Light Tool Kit (FLTK).
+//
+// Copyright 1998-2012 by Bill Spitzak and others.
+//
+// This library is free software. Distribution and use rights are outlined in
+// the file "COPYING" which should have been included with this file.  If this
+// file is missing or damaged, see the license at:
+//
+//     http://www.fltk.org/COPYING.php
+//
+// Please report all bugs and problems on the following page:
+//
+//     http://www.fltk.org/str.php
+//
+
+/**
+  \file fl_line_style.cxx
+  \brief Line style drawing utility hiding different platforms.
+*/
+
+#include "Fl.H"
+#include "fl_draw.H"
+#include "x.H"
+#include "Fl_Printer.H"
+#include "flstring.h"
+#include <stdio.h>
+
+// We save the current line width (absolute value) here.
+// This is currently used only for X11 clipping, see src/fl_rect.cxx.
+// FIXME: this would probably better be in class Fl::
+int fl_line_width_ = 0;
+
+#if __FLTK_MACOSX__
+#ifdef __APPLE_QUARTZ__
+float fl_quartz_line_width_ = 1.0f;
+static /*enum*/ CGLineCap fl_quartz_line_cap_ = kCGLineCapButt;
+static /*enum*/ CGLineJoin fl_quartz_line_join_ = kCGLineJoinMiter;
+static CGFloat *fl_quartz_line_pattern = 0;
+static int fl_quartz_line_pattern_size = 0;
+void fl_quartz_restore_line_style_()
+{
+	CGContextSetLineWidth(fl_gc, fl_quartz_line_width_);
+	CGContextSetLineCap(fl_gc, fl_quartz_line_cap_);
+	CGContextSetLineJoin(fl_gc, fl_quartz_line_join_);
+	CGContextSetLineDash(fl_gc, 0, fl_quartz_line_pattern, fl_quartz_line_pattern_size);
+}
+#endif
+#elif __FLTK_IPHONEOS__
+float fl_quartz_line_width_ = 1.0f;
+static enum CGLineCap fl_quartz_line_cap_ = kCGLineCapButt;
+static enum CGLineJoin fl_quartz_line_join_ = kCGLineJoinMiter;
+static CGFloat *fl_quartz_line_pattern = 0;
+static int fl_quartz_line_pattern_size = 0;
+void fl_quartz_restore_line_style_()
+{
+	CGContextSetLineWidth(fl_gc, fl_quartz_line_width_);
+	CGContextSetLineCap(fl_gc, fl_quartz_line_cap_);
+	CGContextSetLineJoin(fl_gc, fl_quartz_line_join_);
+	CGContextSetLineDash(fl_gc, 0, fl_quartz_line_pattern, fl_quartz_line_pattern_size);
+}
+#elif __FLTK_S60v32__
+float fl_s60_line_width_ = 1.0f;
+int fl_s60_line_style_ = 0;
+#endif
+
+void Fl_Graphics_Driver::line_style(int style, int width, char* dashes)
+{
+
+	// save line width in global variable for X11 clipping
+	if (width == 0) fl_line_width_ = 1;
+	else fl_line_width_ = width>0 ? width : -width;
+
+#if __FLTK_LINUX__
+	int ndashes = dashes ? strlen(dashes) : 0;
+	// emulate the WIN32 dash patterns on X
+	char buf[7];
+	if (!ndashes && (style&0xff)) {
+		int w = width ? width : 1;
+		char dash, dot, gap;
+		// adjust lengths to account for cap:
+		if (style & 0x200) {
+			dash = char(2*w);
+			dot = 1; // unfortunately 0 does not work
+			gap = char(2*w-1);
+		} else {
+			dash = char(3*w);
+			dot = gap = char(w);
+		}
+		char* p = dashes = buf;
+		switch (style & 0xff) {
+		case FL_DASH:
+			*p++ = dash;
+			*p++ = gap;
+			break;
+		case FL_DOT:
+			*p++ = dot;
+			*p++ = gap;
+			break;
+		case FL_DASHDOT:
+			*p++ = dash;
+			*p++ = gap;
+			*p++ = dot;
+			*p++ = gap;
+			break;
+		case FL_DASHDOTDOT:
+			*p++ = dash;
+			*p++ = gap;
+			*p++ = dot;
+			*p++ = gap;
+			*p++ = dot;
+			*p++ = gap;
+			break;
+		}
+		ndashes = p-buf;
+	}
+	static int Cap[4] = {CapButt, CapButt, CapRound, CapProjecting};
+	static int Join[4] = {JoinMiter, JoinMiter, JoinRound, JoinBevel};
+	XSetLineAttributes(fl_display, fl_gc, width,
+	                   ndashes ? LineOnOffDash : LineSolid,
+	                   Cap[(style>>8)&3], Join[(style>>12)&3]);
+	if (ndashes) XSetDashes(fl_display, fl_gc, 0, dashes, ndashes);
+#elif __FLTK_WIN32__
+	// According to Bill, the "default" cap and join should be the
+	// "fastest" mode supported for the platform.  I don't know why
+	// they should be different (same graphics cards, etc., right?) MRS
+	static DWORD Cap[4]= {PS_ENDCAP_FLAT, PS_ENDCAP_FLAT, PS_ENDCAP_ROUND, PS_ENDCAP_SQUARE};
+	static DWORD Join[4]= {PS_JOIN_ROUND, PS_JOIN_MITER, PS_JOIN_ROUND, PS_JOIN_BEVEL};
+	int s1 = PS_GEOMETRIC | Cap[(style>>8)&3] | Join[(style>>12)&3];
+	DWORD a[16];
+	int n = 0;
+	if (dashes && dashes[0]) {
+		s1 |= PS_USERSTYLE;
+		for (n = 0; n < 16 && *dashes; n++) a[n] = *dashes++;
+	} else {
+		s1 |= style & 0xff; // allow them to pass any low 8 bits for style
+	}
+	if ((style || n) && !width) width = 1; // fix cards that do nothing for 0?
+	LOGBRUSH penbrush = {BS_SOLID,fl_RGB(),0}; // can this be fl_brush()?
+	HPEN newpen = ExtCreatePen(s1, width, &penbrush, n, n ? a : 0);
+	if (!newpen) {
+		Fl::error("fl_line_style(): Could not create GDI pen object.");
+		return;
+	}
+	HPEN oldpen = (HPEN)SelectObject(fl_gc, newpen);
+	DeleteObject(oldpen);
+	DeleteObject(fl_current_xmap->pen);
+	fl_current_xmap->pen = newpen;
+#elif __FLTK_WINCE__
+#define PS_ENDCAP_ROUND     0x00000000
+#define PS_ENDCAP_SQUARE    0x00000100
+#define PS_ENDCAP_FLAT      0x00000200
+#define PS_ENDCAP_MASK      0x00000F00
+
+#define PS_JOIN_ROUND       0x00000000
+#define PS_JOIN_BEVEL       0x00001000
+#define PS_JOIN_MITER       0x00002000
+#define PS_JOIN_MASK        0x0000F000
+
+#define PS_GEOMETRIC        0x00010000
+#define PS_USERSTYLE        7
+	// According to Bill, the "default" cap and join should be the
+	// "fastest" mode supported for the platform.  I don't know why
+	// they should be different (same graphics cards, etc., right?) MRS
+	static DWORD Cap[4]= {PS_ENDCAP_FLAT, PS_ENDCAP_FLAT, PS_ENDCAP_ROUND, PS_ENDCAP_SQUARE};
+	static DWORD Join[4]= {PS_JOIN_ROUND, PS_JOIN_MITER, PS_JOIN_ROUND, PS_JOIN_BEVEL};
+	int s1 = PS_GEOMETRIC | Cap[(style>>8)&3] | Join[(style>>12)&3];
+	DWORD a[16];
+	int n = 0;
+	if (dashes && dashes[0]) {
+		s1 |= PS_USERSTYLE;
+		for (n = 0; n < 16 && *dashes; n++) a[n] = *dashes++;
+	} else {
+		s1 |= style & 0xff; // allow them to pass any low 8 bits for style
+	}
+	if ((style || n) && !width) width = 1; // fix cards that do nothing for 0?
+	LOGBRUSH penbrush = {BS_SOLID,fl_RGB(),0}; // can this be fl_brush()?
+	//HPEN newpen = ExtCreatePen(s1, width, &penbrush, n, n ? a : 0);
+	HPEN newpen = CreatePen(s1, width, fl_RGB());
+	if (!newpen) {
+		Fl::error("fl_line_style(): Could not create GDI pen object.");
+		return;
+	}
+	HPEN oldpen = (HPEN)SelectObject(fl_gc, newpen);
+	DeleteObject(oldpen);
+	DeleteObject(fl_current_xmap->pen);
+	fl_current_xmap->pen = newpen;
+#elif __FLTK_MACOSX__
+#if defined(__APPLE_QUARTZ__)
+	static /*enum*/ CGLineCap Cap[4] = { kCGLineCapButt, kCGLineCapButt,
+	                                     kCGLineCapRound, kCGLineCapSquare
+	                                   };
+	static /*enum*/ CGLineJoin Join[4] = { kCGLineJoinMiter, kCGLineJoinMiter,
+	                                       kCGLineJoinRound, kCGLineJoinBevel
+	                                     };
+	if (width<1) width = 1;
+	fl_quartz_line_width_ = (float)width;
+	fl_quartz_line_cap_ = Cap[(style>>8)&3];
+	// when printing kCGLineCapSquare seems better for solid lines
+	if ( Fl_Surface_Device::surface() != Fl_Display_Device::display_device() && style == FL_SOLID && dashes == NULL ) {
+		fl_quartz_line_cap_ = kCGLineCapSquare;
+	}
+	fl_quartz_line_join_ = Join[(style>>12)&3];
+	char *d = dashes;
+	static CGFloat pattern[16];
+	if (d && *d) {
+		CGFloat *p = pattern;
+		while (*d) {
+			*p++ = (float)*d++;
+		}
+		fl_quartz_line_pattern = pattern;
+		fl_quartz_line_pattern_size = d-dashes;
+	} else if (style & 0xff) {
+		char dash, dot, gap;
+		// adjust lengths to account for cap:
+		if (style & 0x200) {
+			dash = char(2*width);
+			dot = 1;
+			gap = char(2*width-1);
+		} else {
+			dash = char(3*width);
+			dot = gap = char(width);
+		}
+		CGFloat *p = pattern;
+		switch (style & 0xff) {
+		case FL_DASH:
+			*p++ = dash;
+			*p++ = gap;
+			break;
+		case FL_DOT:
+			*p++ = dot;
+			*p++ = gap;
+			break;
+		case FL_DASHDOT:
+			*p++ = dash;
+			*p++ = gap;
+			*p++ = dot;
+			*p++ = gap;
+			break;
+		case FL_DASHDOTDOT:
+			*p++ = dash;
+			*p++ = gap;
+			*p++ = dot;
+			*p++ = gap;
+			*p++ = dot;
+			*p++ = gap;
+			break;
+		}
+		fl_quartz_line_pattern_size = p-pattern;
+		fl_quartz_line_pattern = pattern;
+	} else {
+		fl_quartz_line_pattern = 0;
+		fl_quartz_line_pattern_size = 0;
+	}
+	fl_quartz_restore_line_style_();
+#endif
+#elif __FLTK_IPHONEOS__
+#if defined(__APPLE_QUARTZ__)
+	static enum CGLineCap Cap[4] = { kCGLineCapButt, kCGLineCapButt,
+	                                 kCGLineCapRound, kCGLineCapSquare
+	                               };
+	static enum CGLineJoin Join[4] = { kCGLineJoinMiter, kCGLineJoinMiter,
+	                                   kCGLineJoinRound, kCGLineJoinBevel
+	                                 };
+	if (width<1) width = 1;
+	fl_quartz_line_width_ = (float)width;
+	fl_quartz_line_cap_ = Cap[(style>>8)&3];
+	// when printing kCGLineCapSquare seems better for solid lines
+	if ( Fl_Surface_Device::surface() != Fl_Display_Device::display_device() && style == FL_SOLID && dashes == NULL ) {
+		fl_quartz_line_cap_ = kCGLineCapSquare;
+	}
+	fl_quartz_line_join_ = Join[(style>>12)&3];
+	char *d = dashes;
+	static CGFloat pattern[16];
+	if (d && *d) {
+		CGFloat *p = pattern;
+		while (*d) {
+			*p++ = (float)*d++;
+		}
+		fl_quartz_line_pattern = pattern;
+		fl_quartz_line_pattern_size = d-dashes;
+	} else if (style & 0xff) {
+		char dash, dot, gap;
+		// adjust lengths to account for cap:
+		if (style & 0x200) {
+			dash = char(2*width);
+			dot = 1;
+			gap = char(2*width-1);
+		} else {
+			dash = char(3*width);
+			dot = gap = char(width);
+		}
+		CGFloat *p = pattern;
+		switch (style & 0xff) {
+		case FL_DASH:
+			*p++ = dash;
+			*p++ = gap;
+			break;
+		case FL_DOT:
+			*p++ = dot;
+			*p++ = gap;
+			break;
+		case FL_DASHDOT:
+			*p++ = dash;
+			*p++ = gap;
+			*p++ = dot;
+			*p++ = gap;
+			break;
+		case FL_DASHDOTDOT:
+			*p++ = dash;
+			*p++ = gap;
+			*p++ = dot;
+			*p++ = gap;
+			*p++ = dot;
+			*p++ = gap;
+			break;
+		}
+		fl_quartz_line_pattern_size = p-pattern;
+		fl_quartz_line_pattern = pattern;
+	} else {
+		fl_quartz_line_pattern = 0;
+		fl_quartz_line_pattern_size = 0;
+	}
+	fl_quartz_restore_line_style_();
+#endif
+#elif __FLTK_S60v32__
+	// DONE: S60
+	// TODO: S60, Custom dashes support
+	if (width == 0) width = 1;
+	if (style == 0) style = FL_SOLID;
+	fl_s60_line_width_ = width;
+	fl_s60_line_style_ = style;
+	Fl_X::WindowGc->SetPenSize(TSize(width, width));
+	switch (style & 0xFF) {
+	  case FL_SOLID:
+		  Fl_X::WindowGc->SetPenStyle(CGraphicsContext::ESolidPen);
+		  break;
+	  case FL_DASH:
+		  Fl_X::WindowGc->SetPenStyle(CGraphicsContext::EDashedPen);
+		  break;
+	  case FL_DOT:
+		  Fl_X::WindowGc->SetPenStyle(CGraphicsContext::EDottedPen);
+		  break;
+	  case FL_DASHDOT:
+		  Fl_X::WindowGc->SetPenStyle(CGraphicsContext::EDotDashPen);
+		  break;
+	  case FL_DASHDOTDOT:
+		  Fl_X::WindowGc->SetPenStyle(CGraphicsContext::EDotDotDashPen);
+		  break;
+	}
+#elif __FLTK_ANDROID__
+#else
+# error unsupported platform
+#endif
+}
+
+
+//
+// End of "$Id: fl_line_style.cxx 9293 2012-03-18 18:48:29Z manolo $".
+//
