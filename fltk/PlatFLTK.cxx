@@ -359,10 +359,15 @@ void SurfaceFLTK::PenColour(Scintilla::ColourDesired fore)
 
 int SurfaceFLTK::LogPixelsY() // ok
 {
+	//int v = ::GetDeviceCaps(fl_GetDC(0), LOGPIXELSY);
+	//printf("logpixely:%d\n", v);
+	//return v;
+	//*
 	float h, v;
 	Fl::screen_dpi(h, v, 0);
 
 	return (int)v;
+	//*/
 }
 
 int SurfaceFLTK::DeviceHeightFont(int points) // ok
@@ -568,7 +573,7 @@ void SurfaceFLTK::AlphaRectangle(Scintilla::PRectangle rc, int cornerSize, Scint
 	} else {
 		fl_color(outline.GetRed(), outline.GetGreen(), outline.GetBlue());
 		fl_rect(x, y, w, h);
-		printf("%s\n", __FUNCTION__);
+		//printf("%s\n", __FUNCTION__);
 	}
 }
 
@@ -630,7 +635,7 @@ void SurfaceFLTK::Ellipse(Scintilla::PRectangle rc, Scintilla::ColourDesired for
 		fl_end_line();
 
 		fl_pop_matrix();
-		printf("%s\n", __FUNCTION__);
+		//printf("%s\n", __FUNCTION__);
 	}
 }
 
@@ -647,13 +652,14 @@ void SurfaceFLTK::Copy(Scintilla::PRectangle rc, Scintilla::Point from, Scintill
 	} else {
 		x = Scintilla::RoundXYPosition(rc.left);
 		y = Scintilla::RoundXYPosition(rc.top);
-		printf("%s\n", __FUNCTION__);
+		//printf("%s\n", __FUNCTION__);
 	}
 	w = Scintilla::RoundXYPosition(rc.Width());
 	h = Scintilla::RoundXYPosition(rc.Height());
 	srcx = Scintilla::RoundXYPosition(from.x);
 	srcy = Scintilla::RoundXYPosition(from.y);
 	fl_copy_offscreen(x, y, w, h, sf->offscreen_buffer, srcx, srcy);
+	//printf("==>copy, %d, x,y,w,h:%d %d %d %d, srcx,y:%d %d\n", drawtype_,	x, y, w, h, srcx, srcy);
 }
 
 void SurfaceFLTK::DrawTextNoClip(Scintilla::PRectangle rc, Scintilla::Font &font_, Scintilla::XYPOSITION ybase, const char *s, int len, Scintilla::ColourDesired fore, Scintilla::ColourDesired back)
@@ -1050,11 +1056,10 @@ void Scintilla::Menu::CreatePopUp()
 	m = new Fl_Menu_Button(0, 0, 0, 0);
 	m->type(Fl_Menu_Button::POPUP3);
 	mid = m;
-	//mid = ::CreatePopupMenu();
 }
 
-void Scintilla::Menu::Destroy() {
-	//if (mid) ::DestroyMenu(reinterpret_cast<HMENU>(mid));
+void Scintilla::Menu::Destroy() 
+{
 	if (mid) delete (Fl_Menu_Button*)mid;
 	mid = 0;
 }
@@ -1063,14 +1068,7 @@ void Scintilla::Menu::Show(Point pt, Scintilla::Window &w)
 {
 	Fl_Menu_Button *m = (Fl_Menu_Button *)mid;
 	m->popup();
-	//m->menu()->pulldown(pt.x, pt.y, 100, 200, 0);//, w->GetID());
-	//m->menu()->pulldown(1, 1, 100, 200, 0, w->GetID());
-	//m->menu()->popup(1000,1);
-	/*
-	::TrackPopupMenu(reinterpret_cast<HMENU>(mid),
-		TPM_RIGHTBUTTON, static_cast<int>(pt.x - 4), static_cast<int>(pt.y), 0,
-		reinterpret_cast<HWND>(w.GetID()), NULL);
-	*/
+
 	Destroy();
 }
 
@@ -1763,7 +1761,7 @@ void Scintilla::Window::Destroy()
 
 bool Scintilla::Window::HasFocus()
 {
-	printf("%s\n", __FUNCTION__);
+	//printf("%s\n", __FUNCTION__);
 	SCIWinType *swt = (SCIWinType *)wid;
 	if ( swt->type == 0 ) {
 		Fl_Group *w = (Fl_Group *)swt->wid;
@@ -1780,7 +1778,7 @@ bool Scintilla::Window::HasFocus()
 
 Scintilla::PRectangle Scintilla::Window::GetPosition()
 {
-	printf("%s\n", __FUNCTION__);
+	//printf("%s\n", __FUNCTION__);
 	SCIWinType *swt = (SCIWinType *)wid;
 	Fl_Widget *w = (Fl_Widget *)swt->wid;
 	return PRectangle::FromInts(w->x(), w->y(), w->x() + w->w(), w->y() + w->h());
@@ -1802,7 +1800,7 @@ void Scintilla::Window::SetPosition(PRectangle rc)
 	} else {
 		Fl_Window *win = (Fl_Window *)swt->wid;
 		win->resize(x, y, w, h);
-		printf("win : %x\n", win);
+		//printf("win : %x\n", win);
 	}
 }
 
@@ -1810,7 +1808,7 @@ void Scintilla::Window::SetPositionRelative(PRectangle rc, Scintilla::Window win
 {
 	if ( ! wid ) return;
 
-	printf("%s, %d %d %d %d\n", __FUNCTION__, (int)rc.left, (int)rc.top, (int)rc.Width(), (int)rc.Height());
+	//printf("%s, %d %d %d %d\n", __FUNCTION__, (int)rc.left, (int)rc.top, (int)rc.Width(), (int)rc.Height());
 
 	int x = RoundXYPosition(rc.left);
 	int y = RoundXYPosition(rc.top);
@@ -1872,13 +1870,14 @@ void Scintilla::Window::Show(bool show)
 
 void Scintilla::Window::InvalidateAll()
 {
-	printf("InvalidateAll\n");
+	//printf("InvalidateAll\n");
 	if ( ! wid ) return;
 
 	SCIWinType *swt = (SCIWinType *)wid;
 	if ( swt->type == 0 ) {
 		Fl_Group *w = (Fl_Group *)swt->wid;
 		w->damage(FL_DAMAGE_ALL, swt->rc_client.x, swt->rc_client.y, swt->rc_client.w, swt->rc_client.h);
+		//printf("damage all:%d %d %d %d\n", swt->rc_client.x, swt->rc_client.y, swt->rc_client.w, swt->rc_client.h);
 	} else {
 		Fl_Window *win = (Fl_Window *)swt->wid;
 		win->damage(FL_DAMAGE_ALL, 0, 0, win->w(), win->h());
@@ -1978,7 +1977,7 @@ void Scintilla::Window::SetCursor(Cursor curs)
 
 void Scintilla::Window::SetTitle(const char *s)
 {
-	printf("%s, %s\n", __FUNCTION__, s);
+	//printf("%s, %s\n", __FUNCTION__, s);
 	SCIWinType *swt = (SCIWinType *)wid;
 	Fl_Group *w = (Fl_Group *)swt->wid;
 	w->copy_label(s);	
@@ -1988,7 +1987,7 @@ void Scintilla::Window::SetTitle(const char *s)
 /* Returns rectangle of monitor pt is on, both rect and pt are in Window's coordinates */
 Scintilla::PRectangle Scintilla::Window::GetMonitorRect(Scintilla::Point pt)
 {
-	printf("%s\n", __FUNCTION__);
+	//printf("%s\n", __FUNCTION__);
 	return Scintilla::PRectangle();
 	/*
 	// MonitorFromPoint and GetMonitorInfo are not available on Windows 95 and NT 4.

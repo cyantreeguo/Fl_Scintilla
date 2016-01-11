@@ -91,6 +91,52 @@ public:
 		return Open("UTF-8", "");
 	}
 
+	unsigned char OpenFromCodepage(int codepage, char *to)
+	{
+		if ( codepage == 936   ) return Open("GB18030", to); // SC_CHARSET_GB2312
+		if ( codepage == 950   ) return Open("BIG5", to); // SC_CHARSET_CHINESEBIG5 繁体中文
+		if ( codepage == 1257  ) return Open("", to); // SC_CHARSET_BALTIC 波罗的海字集		
+		if ( codepage == 1250  ) return Open("", to); // SC_CHARSET_EASTEUROPE 中欧语系		
+		if ( codepage == 1253  ) return Open("", to); // SC_CHARSET_GREEK 希腊文
+		if ( codepage == 949   ) return Open("HANGUL", to); // SC_CHARSET_HANGUL 韩文
+		if ( codepage == 10000 ) return Open("", to); // SC_CHARSET_MAC
+		if ( codepage == 437   ) return Open("", to); // SC_CHARSET_OEM 地区自订
+		if ( codepage == 1251  ) return Open("", to); // SC_CHARSET_RUSSIAN 俄文 (斯拉夫语系)
+		if ( codepage == 932   ) return Open("", to); // SC_CHARSET_SHIFTJIS 日语
+		if ( codepage == 1254  ) return Open("", to); // SC_CHARSET_TURKISH 土耳其文
+		if ( codepage == 1361  ) return Open("JOHAB", to); // SC_CHARSET_JOHAB 韩语
+		if ( codepage == 1255  ) return Open("", to); // SC_CHARSET_HEBREW 希伯来文
+		if ( codepage == 1256  ) return Open("", to); // SC_CHARSET_ARABIC 阿拉伯文
+		if ( codepage == 1258  ) return Open("", to); // SC_CHARSET_VIETNAMESE 越南文
+		if ( codepage == 874   ) return Open("", to); // SC_CHARSET_THAI 泰文
+		if ( codepage == 28605 ) return Open("ISO-8859-15", to); // SC_CHARSET_8859_15
+
+		return Open("", to);
+	}
+
+	unsigned char OpenToCodepage(char *from, int codepage)
+	{
+		if ( codepage == 936   ) return Open(from, "GB18030"); // SC_CHARSET_GB2312
+		if ( codepage == 950   ) return Open(from, "BIG5"); // SC_CHARSET_CHINESEBIG5 繁体中文
+		if ( codepage == 1257  ) return Open(from, ""); // SC_CHARSET_BALTIC 波罗的海字集		
+		if ( codepage == 1250  ) return Open(from, ""); // SC_CHARSET_EASTEUROPE 中欧语系		
+		if ( codepage == 1253  ) return Open(from, ""); // SC_CHARSET_GREEK 希腊文
+		if ( codepage == 949   ) return Open(from, "HANGUL"); // SC_CHARSET_HANGUL 韩文
+		if ( codepage == 10000 ) return Open(from, ""); // SC_CHARSET_MAC
+		if ( codepage == 437   ) return Open(from, ""); // SC_CHARSET_OEM 地区自订
+		if ( codepage == 1251  ) return Open(from, ""); // SC_CHARSET_RUSSIAN 俄文 (斯拉夫语系)
+		if ( codepage == 932   ) return Open(from, ""); // SC_CHARSET_SHIFTJIS 日语
+		if ( codepage == 1254  ) return Open(from, ""); // SC_CHARSET_TURKISH 土耳其文
+		if ( codepage == 1361  ) return Open(from, "JOHAB"); // SC_CHARSET_JOHAB 韩语
+		if ( codepage == 1255  ) return Open(from, ""); // SC_CHARSET_HEBREW 希伯来文
+		if ( codepage == 1256  ) return Open(from, ""); // SC_CHARSET_ARABIC 阿拉伯文
+		if ( codepage == 1258  ) return Open(from, ""); // SC_CHARSET_VIETNAMESE 越南文
+		if ( codepage == 874   ) return Open(from, ""); // SC_CHARSET_THAI 泰文
+		if ( codepage == 28605 ) return Open(from, "ISO-8859-15"); // SC_CHARSET_8859_15
+
+		return Open(from, "");
+	}
+
 	unsigned char Open(const char *from_charset,const char *to_charset)
 	{
 		Close();
@@ -115,18 +161,26 @@ public:
 
 	int GetLength(char *src, int len)
 	{
-		if ( len < 1 ) return 0;
-		int outlen=len*8;
-		void *p;
-		if ( outlen > outlen_ ) {
-			p = realloc(out_, outlen);
-			if ( p == NULL ) return 0;
-			out_ = (char *)p;
-			outlen_ = outlen;
-		}
-		int r = convert(src, len, out_, outlen);
+#if __FLTK_MACOSX__ || __FLTK_IPHONEOS__
+		if ( (uintptr_t)cd > 0 ) {
+#else
+		if ( (int)cd > 0 ) {
+#endif
+			if ( len < 1 ) return 0;
+			int outlen=len*8;
+			void *p;
+			if ( outlen > outlen_ ) {
+				p = realloc(out_, outlen);
+				if ( p == NULL ) return 0;
+				out_ = (char *)p;
+				outlen_ = outlen;
+			}
+			int r = convert(src, len, out_, outlen);
 
-		return r;
+			return r;
+		}
+
+		return 0;
 	}
 
 	int convert(char *inbuf, int inlen, char *outbuf, int outlen) 

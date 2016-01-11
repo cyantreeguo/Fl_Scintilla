@@ -114,6 +114,7 @@ protected:
 	Fl_Scrollbar* mHScrollBar;
 	Fl_Scrollbar* mVScrollBar;
 	int scrollbar_width_;
+	unsigned char scrollpush_; // 0-not click, 1-vscroll, 2-hscroll
 
 	static void h_scrollbar_cb(Fl_Scrollbar* w, Fl_Scintilla* d);
 	static void v_scrollbar_cb( Fl_Scrollbar* w, Fl_Scintilla* d);
@@ -122,48 +123,31 @@ protected:
 	int scrollbar_width() const { return scrollbar_width_; }
 	void scrollbar_width(int W) { scrollbar_width_ = W; }
 
-	bool lastKeyDownConsumed;
+	int handle_key(int event);
 
+	bool lastKeyDownConsumed;
 	bool capturedMouse;
+	bool LButtonDown;
 
 	unsigned int linesPerScroll;	///< Intellimouse support
 	int wheelDelta; ///< Wheel delta from roll	
 
 	virtual void Initialise();
 	virtual void Finalise();
+
 	int CodePageOfDocument() const;
-	virtual bool ValidCodePage(int codePage) const
-	{ 
-		return codePage == 0 || codePage == SC_CP_UTF8 || codePage == 932 || codePage == 936 || codePage == 949 || codePage == 950 || codePage == 1361;
-	}
+	virtual bool ValidCodePage(int codePage) const;
 
 	virtual void ScrollText(int linesToMove);
 	virtual void SetVerticalScrollPos();
 	virtual void SetHorizontalScrollPos();
 	virtual bool ModifyScrollBars(int nMax, int nPage);
 
-	virtual void Copy();
-	virtual void CopyAllowLine();
-	virtual bool CanPaste();
-	virtual void CopyToClipboard(const Scintilla::SelectionText &selectedText);
-	virtual void Paste();
-	void DoPaste(const char *s);
-
 	virtual void ClaimSelection() {}
 	virtual void NotifyChange();
 	virtual void NotifyFocus(bool focus);
-	virtual void NotifyParent(Scintilla::SCNotification scn)
-	{
-		if ( cb_notify_.callback == NULL ) return;
-		cb_notify_.callback(&scn, cb_notify_.data);
-		/*
-		scn.nmhdr.hwndFrom = MainHWND();
-		scn.nmhdr.idFrom = GetCtrlID();
-		::SendMessage(::GetParent(MainHWND()), WM_NOTIFY,
-			GetCtrlID(), reinterpret_cast<LPARAM>(&scn));
-		printf("%s\n", __FUNCTION__);
-		*/
-	}
+	virtual void NotifyParent(Scintilla::SCNotification scn);
+	//virtual void NotifyDoubleClick(Point pt, int modifiers); // do not need
 	virtual bool FineTickerAvailable() { return true; }
 	virtual bool FineTickerRunning(Scintilla::Editor::TickReason reason);
 	virtual void FineTickerStart(Scintilla::Editor::TickReason reason, int millis, int tolerance);
@@ -171,8 +155,20 @@ protected:
 	virtual bool SetIdle(bool on);
 	virtual void SetMouseCapture(bool on);
 	virtual bool HaveMouseCapture();
+	virtual void SetTrackMouseLeaveEvent(bool on);
 	virtual bool PaintContains(Scintilla::PRectangle rc);
 	void FullPaint();
+
+	// do not need
+	//virtual void SetCtrlID(int identifier);
+	//virtual int GetCtrlID();
+
+	virtual void Copy();
+	virtual void CopyAllowLine();
+	virtual bool CanPaste();
+	virtual void CopyToClipboard(const Scintilla::SelectionText &selectedText);
+	virtual void Paste();
+	void DoPaste(const char *s);
 
 	char *drag_str_;
 	int drag_str_size_;
@@ -184,16 +180,8 @@ protected:
 	void Drop();
 	void SaveDragData(const Scintilla::SelectionText &selectedText);
 
-	virtual Scintilla::CaseFolder *CaseFolderForEncoding()
-	{
-		printf("%s\n", __FUNCTION__);
-		return NULL;
-	}
-	virtual std::string CaseMapString(const std::string &s, int caseMapping)
-	{
-		printf("%s\n", __FUNCTION__);
-		return 0;
-	}
+	virtual Scintilla::CaseFolder *CaseFolderForEncoding();
+	virtual std::string CaseMapString(const std::string &s, int caseMapping);
 
 	Fl_Window *callwin_;
 	virtual void CreateCallTipWindow(Scintilla::PRectangle rc);
@@ -232,7 +220,6 @@ protected:
 	friend class ScintillaEditBase;
 
 private:
-	enum { invalidTimerID, standardTimerID, idleTimerID, fineTimerStart };
 	unsigned char timeractive_[5];
 	double timetick_[5];
 	static void static_time_fun_1(void *x) { Fl_Scintilla *sci = (Fl_Scintilla*)x; sci->time_fun(0); }
@@ -240,26 +227,11 @@ private:
 	static void static_time_fun_3(void *x) { Fl_Scintilla *sci = (Fl_Scintilla*)x; sci->time_fun(2); }
 	static void static_time_fun_4(void *x) { Fl_Scintilla *sci = (Fl_Scintilla*)x; sci->time_fun(3); }
 	static void static_time_fun_5(void *x) { Fl_Scintilla *sci = (Fl_Scintilla*)x; sci->time_fun(4); }
-	void time_fun(int index)
-	{
-		//return;
-		if (index == idleTimerID && idler.state) {
-			//SendMessage(MainHWND(), SC_WIN_IDLE, 0, 1);
-		} else {
-			if ( index == 0 ) TickFor(tickCaret);
-			//else if ( index == 1 ) TickFor(tickScroll);
-			else if ( index == 2 ) TickFor(tickWiden);
-			else if ( index == 3 ) TickFor(tickDwell);
-			else if ( index == 4 ) TickFor(tickPlatform);
-			//TickFor(static_cast<TickReason>(index-tickCaret));
-			//if( index == 0 )printf("%d\n", index);
-		}
-		if ( index == 0 ) Fl::repeat_timeout(timetick_[0], static_time_fun_1, this);
-		if ( index == 1 ) Fl::repeat_timeout(timetick_[1], static_time_fun_2, this);
-		if ( index == 2 ) Fl::repeat_timeout(timetick_[2], static_time_fun_3, this);
-		if ( index == 3 ) Fl::repeat_timeout(timetick_[3], static_time_fun_4, this);
-		if ( index == 4 ) Fl::repeat_timeout(timetick_[4], static_time_fun_5, this);
-	}
+	void time_fun(int index);
+
+	unsigned int idle_dwstart_;
+	static void static_time_idle(void *x) { Fl_Scintilla *sci = (Fl_Scintilla*)x; sci->time_fun_idle(); }
+	void time_fun_idle();
 
 	// For use in creating a system caret
 	bool HasCaretSizeChanged() const;
@@ -268,14 +240,12 @@ private:
 	int sysCaretWidth;
 	int sysCaretHeight;
 
+	void RefreshIME();
 	void MoveImeCarets(int offset);
 	virtual void UpdateSystemCaret();
 
 public:
 	void CallTip_DoPush();
-
-protected:
-	virtual void SetTrackMouseLeaveEvent(bool on);
 };
 
 #endif
