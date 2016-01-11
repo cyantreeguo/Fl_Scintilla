@@ -168,7 +168,6 @@ static void cb_editor(Scintilla::SCNotification *scn, void *data)
 	Scintilla::SCNotification *notify = scn;
 
 	if(notify->nmhdr.code == SCN_MARGINCLICK ) {
-		printf("%d\n", notify->nmhdr.idFrom);
 		if ( notify->margin == 3) {
 			// 确定是页边点击事件
 			const int line_number = editor->SendEditor(SCI_LINEFROMPOSITION,notify->position);
@@ -260,14 +259,27 @@ static void cb_editor(Scintilla::SCNotification *scn, void *data)
 }
 int main(int argc, char **argv)
 {
+	HDC hdc = GetDC(NULL);
+	if (hdc)
+	{
+		// Initialize the DPIManager member variable
+		// This will correspond to the DPI setting
+		// With all Windows OS's to date the X and Y DPI will be identical					
+		int x = GetDeviceCaps(hdc, LOGPIXELSX);
+		int y = GetDeviceCaps(hdc, LOGPIXELSY);
+		ReleaseDC(NULL, hdc);
+
+		printf("dpi x, y:%d %d\n", x, y);
+	}
+
 	Fl::get_system_colors();
 
-	Fl_Window *win = new Fl_Double_Window(800, 400, 800, 600, "scintilla for fltk");
+	Fl_Window *win = new Fl_Double_Window(800, 400, 800, 500, "scintilla for fltk");
 
 	win->color(fl_rgb_color(0, 128, 128));
 
 	win->begin();
-	editor = new Fl_Scintilla(60, 50, 700, 500);
+	editor = new Fl_Scintilla(60, 5, 700, 400);
 	editor->SetNotify(cb_editor, 0);
 	{
 		//editor->box(FL_FLAT_BOX);
@@ -292,6 +304,7 @@ int main(int argc, char **argv)
 		        "bool char float int long short void wchar_t";
 
 		// 设置全局风格
+		//editor->SendEditor(SCI_STYLESETFONT, STYLE_DEFAULT,(sptr_t)"Fixedsys");//"Courier New");
 		editor->SendEditor(SCI_STYLESETFONT, STYLE_DEFAULT,(sptr_t)"Courier New");
 		editor->SendEditor(SCI_STYLESETSIZE, STYLE_DEFAULT,10);
 		editor->SendEditor(SCI_STYLECLEARALL);
@@ -374,34 +387,19 @@ int main(int argc, char **argv)
 		editor->SendEditor(SCI_SETFOLDFLAGS, 16|4, 0); //如果折叠就在折叠行的上下各画一条横线
 		//*/
 
-		editor->SendEditor(SCI_SETCODEPAGE, SC_CP_UTF8);
-		//editor->SendEditor(SCI_SETCODEPAGE, 936);
+		editor->SendEditor(SCI_SETTABWIDTH, 4);
+
+		//editor->SendEditor(SCI_SETCODEPAGE, SC_CP_UTF8);
+		editor->SendEditor(SCI_SETCODEPAGE, 936);
 		//editor->SendEditor(SCI_STYLESETCHARACTERSET, SC_CHARSET_GB2312);
 
 		//editor->SendEditor(SCI_SETHSCROLLBAR, false);
-
-		Fl_ComboBox *fc = new Fl_ComboBox(5,5,180,25,"Test", 6);
-		fc->innerinput()->value("1234");
-		fc->add("onexxxxxxxxxxxxxxxxx");
-		fc->add("two");
-		fc->add("three");
-		fc->add("onexxxxxxxxxxxxxx1xxx");
-		fc->add("onexxxxxxxxxxxx1ghx");
-		fc->add("onexxxxxxx2xxxxxxxx");
-		fc->add("onexxxxx1xxxdffdxxxxx");
-		fc->add("汉字onexxxxxxxxxxxxxx");
-		fc->add("onexx1xxxxxxxxx");
-		fc->add("onexxx2xxxxxx");
-		fc->add("onexxxxxx1xxxx2xxxxx");
-		fc->add("onexxxxxx5xxxx2xxxxx");
-		fc->add("onexxxxxxx6xxx2xxxxx");
-		fc->add("end");
 	}
 
-	Fl_Button *btn = new Fl_Button(100, 560, 80, 30, "Open");
+	Fl_Button *btn = new Fl_Button(100, 410, 80, 30, "Open");
 	btn->callback(cb_btn);
 
-	btn1 = new Fl_Button(0, 560, 80, 30, "1");
+	btn1 = new Fl_Button(0, 410, 80, 30, "1");
 
 	win->end();
 	win->resizable(win);
