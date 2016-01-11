@@ -3,6 +3,7 @@ Port of Scintilla to FLTK
 
 Need library: iconv and fltk
 
+Now can comile under windows, linux and osx(ios testing)
 ![shotsnap](shotsnap.jpg)
 
 ============================
